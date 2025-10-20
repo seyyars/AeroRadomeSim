@@ -1,0 +1,66 @@
+name: build-figures
+on:
+  workflow_dispatch: {}     # اجرا با دکمه Run workflow
+  push:
+    paths:
+      - "scripts/**"
+      - "src/**"
+      - "pyproject.toml"
+      - ".github/workflows/figs.yml"
+
+jobs:
+  figures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package (editable) + pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+
+      - name: Run unit tests (optional but مفید)
+        run: pytest -q
+
+      - name: Build figures
+        run: |
+          python - << "PY"
+          import matplotlib; matplotlib.use("Agg")
+          import numpy as np, matplotlib.pyplot as plt
+          from pathlib import Path
+          from aeroradomesim.aero import mach_sweep
+          from aeroradomesim.radome_rf import layer, tmm_s21
+
+          out = Path("docs/img"); out.mkdir(parents=True, exist_ok=True)
+
+          res = mach_sweep(h=1000.0, N=201)
+          M, q = res["M"], res["q"]
+          plt.figure(); plt.plot(M, q); plt.grid(True)
+          plt.xlabel("Mach"); plt.ylabel("q (Pa)")
+          plt.title("Dynamic pressure vs Mach @ 1 km")
+          plt.savefig(out/"q_vs_mach.png", dpi=160, bbox_inches="tight"); plt.close()
+
+          f = np.linspace(1.5e9, 3.5e9, 350)
+          eps_r = lambda T: 3.8 + 1.5e-3*(T-300.0)
+          tan_d = lambda T: 2e-3 + 2e-5*(T-300.0)
+          for T in (300.0, 420.0):
+              s21 = tmm_s21(f, [layer(0.010, eps_r(T), tan_d(T))], theta=0.0, pol="TE")
+              plt.figure(); plt.plot(f*1e-9, 20*np.log10(np.abs(s21))); plt.grid(True)
+              plt.xlabel("Frequency (GHz)"); plt.ylabel("|S21| (dB)")
+              plt.title(f"Radome transmission vs frequency (T={T:.0f} K)")
+              plt.savefig(out/f"radome_s21_T{int(T)}K.png", dpi=160, bbox_inches="tight"); plt.close()
+
+          # اطمینان از وجود خروجی
+          assert any(out.iterdir()), "No figures were generated!"
+          print("Saved to:", out.resolve())
+          PY
+
+      - name: Upload figures as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeroradomesim-figs
+          path: docs/img/*
+          if-no-files-found: error
