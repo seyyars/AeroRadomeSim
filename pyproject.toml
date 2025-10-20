@@ -1,0 +1,18 @@
+[project]
+name = "aeroradomesim"
+version = "1.0.0"
+description = "Numerical simulation of Mach-0–3 aerothermodynamics and temperature-dependent radome RF transmission"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.22", "scipy>=1.9", "matplotlib>=3.6"]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
