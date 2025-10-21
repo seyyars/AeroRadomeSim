@@ -1,8 +1,9 @@
 cff-version: 1.2.0
 title: "AeroRadomeSim: Numerical simulation of Mach-0–3 aerothermodynamics and temperature-dependent radome RF transmission"
 authors:
-  - family-names: YourFamily
-    given-names: YourGiven
+  - family-names: Asgari
+    given-names: Seyed Arsham
+    orcid: "https://orcid.org/0009-0001-6783-2245"
 version: "1.0.0"
 date-released: "2025-10-20"
 repository-code: "https://github.com/seyyars/AeroRadomeSim"
