@@ -1,3 +1,4 @@
+[![ORCID](https://img.shields.io/badge/ORCID-0009--0001--6783--2245-brightgreen.svg)](https://orcid.org/0009-0001-6783-2245)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17408777.svg)](https://doi.org/10.5281/zenodo.17408777)
 Archived release (v1.0.1): [10.5281/zenodo.17408778](https://doi.org/10.5281/zenodo.17408778)
 
