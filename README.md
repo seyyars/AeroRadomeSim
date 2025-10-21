@@ -26,3 +26,5 @@ print(abs(s21[0]))
 Radome transmission vs frequency  
 ![T=300K](docs/img/radome_s21_T300K.png)
 ![T=420K](docs/img/radome_s21_T420K.png)
+
+print(abs(s21[0]))
