@@ -19,3 +19,10 @@ print(res["q"][:3])
 # Single-layer radome transmission @ 2.4 GHz, normal incidence
 s21 = tmm_s21([2.4e9], [layer(0.010, 3.0, 0.0)], theta=0.0, pol="TE")
 print(abs(s21[0]))
+
+## Screenshots
+![q vs Mach](docs/img/q_vs_mach.png)
+
+Radome transmission vs frequency  
+![T=300K](docs/img/radome_s21_T300K.png)
+![T=420K](docs/img/radome_s21_T420K.png)
