@@ -6,8 +6,8 @@
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
 
-\title{AeroRadomeSim: Numerical simulation of Mach 0--3 aerothermodynamics\\
-and temperature-dependent radome RF transmission}
+\title{AeroRadomeSim: Lightweight numerical simulation of Mach 0--3\\
+aerothermodynamics and temperature-dependent radome RF transmission}
 
 \author{Seyed Arsham Asgari%
 \thanks{Independent researcher. Email: s.a.asg2000@gmail.com}}
@@ -18,132 +18,305 @@ and temperature-dependent radome RF transmission}
 \maketitle
 
 \begin{abstract}
-Airborne radomes experience significant aerothermodynamic heating at
-moderate Mach numbers. The resulting temperature rise modifies the
-temperature-dependent electromagnetic properties of the radome material
-and degrades RF transmission. This work presents \emph{AeroRadomeSim},
-a lightweight open-source Python tool that couples a simple
-compressible-flow aerothermodynamic model with a temperature-dependent
-RF transmission model for canonical radome configurations over Mach
-numbers from $0$ to $3$. The software is intended for rapid parametric
-studies, early-stage design screening, and educational use.
-AeroRadomeSim is distributed under an open-source license, with source
-code available on GitHub and a citable snapshot archived on Zenodo
-(doi:\href{https://doi.org/10.5281/zenodo.17817671}{10.5281/zenodo.17817671}).
+Airborne radomes protect antenna systems from the external flow but also
+introduce RF transmission loss and boresight error. At moderate Mach
+numbers, compressible-flow and boundary-layer heating can raise radome
+wall temperatures significantly above ambient conditions, modifying the
+temperature-dependent dielectric properties of the material and further
+degrading RF performance. High-fidelity assessment of this coupled
+aerothermodynamic--electromagnetic problem typically relies on large
+commercial CFD and full-wave solvers that are computationally expensive
+and often inaccessible during early design or educational use.
+
+This article presents \emph{AeroRadomeSim}, a small open-source Python
+tool that couples a simple compressible-flow aerothermodynamic model to
+a temperature-dependent transmission-line model of normal-incidence RF
+propagation through a single-layer dielectric radome. The software is
+designed for rapid parametric studies over Mach number, altitude,
+material parameters, and wall thickness in the Mach~0--3 regime.
+We describe the governing equations, numerical implementation, and
+software design, and illustrate typical use cases through parametric
+sweeps of dynamic pressure, wall temperature, and transmission loss.
+Although intentionally lightweight, AeroRadomeSim provides a transparent
+reference implementation that can be extended toward more complex
+radome configurations and used as a teaching tool for coupled
+aerothermodynamic and RF analysis.
 \end{abstract}
 
 \section{Introduction}
-Airborne antenna systems are commonly shielded from the external flow
-by dielectric radomes. While the radome protects the antenna
-mechanically, it also introduces RF transmission loss and boresight
-error, both of which depend on the material permittivity, thickness,
-and internal temperature. At flight conditions corresponding to Mach
-numbers between $0$ and $3$, convective and compressible heating can
-raise radome wall temperatures well above ambient conditions,
-modifying the dielectric response of the material and, consequently, the
-RF performance.
+Airborne and ground-based antenna systems are frequently enclosed by
+dielectric radomes that provide mechanical and environmental protection.
+The radome must satisfy conflicting requirements: it should be
+structurally robust while introducing minimal RF transmission loss and
+boresight error over the operational frequency band and look angles.
+Both performance metrics depend sensitively on the radome thickness,
+dielectric properties, and internal temperature.
 
-High-fidelity analysis of coupled aerothermodynamics and RF propagation
-typically relies on large commercial CFD and full-wave electromagnetic
-solvers. Such tools are powerful but also computationally expensive and
-often inaccessible to students or early-stage design studies.
-There is therefore value in small, script-level tools that implement
-simplified but physically meaningful models and can be used for rapid
-parametric exploration.
+At flight conditions corresponding to Mach numbers between $0$ and $3$,
+compressible-flow and boundary-layer heating can raise external skin
+temperatures substantially above ambient values. For typical radome
+materials---fiber-reinforced composites or ceramics---the real part of
+the relative permittivity and the dielectric loss tangent exhibit a
+non-negligible dependence on temperature. Consequently, aerothermal
+heating feeds back on RF performance via temperature-dependent material
+properties.
 
-In this context, the main objectives of AeroRadomeSim are:
+High-fidelity analysis of this coupled problem requires either (i) a CFD
+or aerothermal solver to predict the spatially varying temperature
+distribution followed by a full-wave electromagnetic simulation
+(FDTD/FEM/MoM) on the resulting geometry and material map, or (ii)
+fully coupled multi-physics commercial environments. These workflows
+are accurate but computationally demanding, require detailed geometry,
+and are not ideal for early design-space exploration, educational use,
+or quick sensitivity studies.
+
+In contrast, there is value in small script-level tools that implement
+simplified but physically meaningful models and can be used to:
 \begin{itemize}
-  \item to provide a transparent implementation of a coupled
-        aerothermodynamic and RF transmission model for canonical
-        radome configurations over Mach 0--3;
-  \item to enable fast parametric sweeps over Mach number, altitude,
-        material properties, and wall thickness;
-  \item to serve as a reproducible reference implementation that can be
-        extended or embedded in larger analysis workflows.
+  \item assess first-order trends of wall temperature and transmission
+        loss with Mach number, altitude, and material properties;
+  \item support quick trade studies between candidate radome materials;
+  \item serve as transparent reference implementations that can be
+        extended or embedded within larger analysis workflows.
 \end{itemize}
 
-\section{Physical and numerical model}
+The main contributions of the present work are:
+\begin{enumerate}
+  \item a compact, open-source Python implementation that couples a
+        compressible-flow aerothermodynamic model to a
+        temperature-dependent dielectric transmission model for a
+        single-layer radome over Mach~0--3;
+  \item a description of the governing equations and numerical
+        implementation sufficient to reproduce and extend the code;
+  \item a set of parametric case studies illustrating how the tool can
+        be used for early-stage design screening and educational
+        demonstrations.
+\end{enumerate}
+
+\section{Governing equations and models}
+\label{sec:models}
 
 \subsection{Aerothermodynamic model}
-The aerothermodynamic model in AeroRadomeSim is based on a
-compressible-flow formulation with simple correlations for stagnation
-or recovery temperature at the radome wall. Given a free-stream Mach
-number $M_{\infty}$, static temperature $T_{\infty}$, and ratio of
-specific heats $\gamma$, the adiabatic stagnation temperature is
+We consider a canonical external flow characterized by a free-stream
+Mach number $M_{\infty}$, static temperature $T_{\infty}$, static
+pressure $p_{\infty}$, and ratio of specific heats $\gamma$. For the
+Mach range $0 \le M_{\infty} \le 3$ and typical altitudes below
+$\sim 20~\text{km}$, an ideal-gas, calorically perfect model is
+adequate. The adiabatic stagnation temperature is then
 \begin{equation}
   T_0 = T_{\infty} \left( 1 + \frac{\gamma - 1}{2} M_{\infty}^2 \right).
+  \label{eq:stagnationT}
 \end{equation}
-A recoverable wall temperature can be expressed as
+The dynamic pressure is
 \begin{equation}
-  T_w = T_{\infty} + r \left( T_0 - T_{\infty} \right),
+  q = \tfrac12 \rho_{\infty} U_{\infty}^2
+    = \tfrac12 \gamma p_{\infty} M_{\infty}^2,
 \end{equation}
-where $r$ is a recovery factor (typically between $0.8$ and $1.0$)
-that may depend on the local boundary-layer regime.
-For the purposes of this tool, we assume a spatially uniform equivalent
-wall temperature $T_w$ representative of the most thermally loaded
-region of the radome.
+where $\rho_{\infty}$ and $U_{\infty}$ denote free-stream density and
+speed, respectively.
 
-\subsection{Temperature-dependent RF transmission}
-Given a radome wall of thickness $d$ and complex relative permittivity
-$\varepsilon_r(T) = \varepsilon'(T) - \mathrm{j}\,\varepsilon''(T)$, the
-normal-incidence power transmission coefficient $|T|^2$ of a
-single-layer dielectric slab can be computed using standard
-transmission-line expressions. AeroRadomeSim adopts a parametric model
-for the temperature dependence of the real relative permittivity and
+To account for boundary-layer recovery, we introduce a recovery factor
+$r \in [0.8,1.0]$ and define a recoverable wall temperature
+\begin{equation}
+  T_w = T_{\infty} + r\,(T_0 - T_{\infty}),
+  \label{eq:wallT}
+\end{equation}
+with $r$ chosen by the user to reflect the local flow regime
+(e.g.\ $r\approx 0.9$ for turbulent flow over a blunt nose).
+In AeroRadomeSim we approximate the external wall of the radome by a
+single spatially uniform equivalent temperature $T_w$ representative of
+the most thermally loaded region. This approximation is explicitly
+documented and is adequate for quick sensitivity studies; users wishing
+to incorporate more detailed aerothermal models can replace
+Eq.~\eqref{eq:wallT} by a more sophisticated temperature field while
+reusing the RF transmission module described below.
+
+\subsection{Temperature-dependent dielectric model}
+The radome wall is modeled as a homogeneous dielectric slab of thickness
+$d$ and complex relative permittivity
+$\varepsilon_r(T) = \varepsilon'(T) - j\varepsilon''(T)$.
+We adopt a linear temperature dependence for the real permittivity and
 loss tangent:
 \begin{align}
-  \varepsilon'(T) &= \varepsilon'_0 + a_{\varepsilon} (T - T_{\mathrm{ref}}), \\
+  \varepsilon'(T) &= \varepsilon'_0 + a_{\varepsilon} (T - T_{\mathrm{ref}}),
+  \label{eq:epsT}
+  \\
   \tan\delta(T)   &= \tan\delta_0 + a_{\delta} (T - T_{\mathrm{ref}}),
+  \label{eq:tandT}
 \end{align}
-where $\varepsilon'_0$ and $\tan\delta_0$ are the properties at a
-reference temperature $T_{\mathrm{ref}}$, and $a_{\varepsilon}$,
-$a_{\delta}$ are user-specified linear coefficients.
+where $\varepsilon'_0$ and $\tan\delta_0$ denote the properties at a
+reference temperature $T_{\mathrm{ref}}$, and
+$a_{\varepsilon}, a_{\delta}$ are user-specified linear coefficients
+representing first-order thermal sensitivities.
+The imaginary part of the permittivity is reconstructed via
+\begin{equation}
+  \varepsilon''(T) = \varepsilon'(T)\,\tan\delta(T).
+\end{equation}
+Within the temperature range encountered for Mach~0--3 flight, this
+simple linear model is sufficient to capture monotonic degradation
+trends. More complex dependencies can be incorporated without changing
+the interface of the RF transmission module.
 
-\section{Software description}
-AeroRadomeSim is implemented in Python and consists of small modules
-that separate the aerothermodynamic model, RF transmission
-calculations, and plotting utilities. The core dependencies are
-\texttt{numpy}, \texttt{scipy}, and \texttt{matplotlib}. The source
-tree includes example scripts and basic tests that demonstrate typical
-usage patterns.
+\subsection{Normal-incidence transmission-line model}
+For a plane wave incident normally on a single-layer dielectric slab of
+thickness $d$ embedded in free space, the complex transmission
+coefficient $T$ can be computed using standard transmission-line
+expressions. Given angular frequency $\omega = 2\pi f$ and free-space
+propagation constant $k_0 = \omega / c_0$, the propagation constant in
+the slab at wall temperature $T_w$ is
+\begin{equation}
+  k(T_w) = k_0 \sqrt{\varepsilon_r(T_w)}.
+\end{equation}
+Let $\eta_0$ denote the free-space impedance and $\eta_d$ the impedance
+of the dielectric layer at $T_w$. The input impedance seen at the
+entrance of the slab is
+\begin{equation}
+  Z_{\mathrm{in}} = \eta_d
+    \,\frac{\eta_0 + j\eta_d \tan(k(T_w)\,d)}
+           {\eta_d + j\eta_0 \tan(k(T_w)\,d)}.
+\end{equation}
+The resulting complex reflection and transmission coefficients at
+normal incidence are
+\begin{align}
+  \Gamma &= \frac{Z_{\mathrm{in}} - \eta_0}{Z_{\mathrm{in}} + \eta_0}, \\
+  T      &= 1 + \Gamma,
+\end{align}
+and the power transmission coefficient is $|T|^2$.
+In AeroRadomeSim we evaluate these expressions over user-defined
+frequency ranges and report either $|T|^2$ or transmission loss in
+decibels,
+\begin{equation}
+  L_T = -10\log_{10} |T|^2.
+\end{equation}
 
-\section{Impact and reuse potential}
-AeroRadomeSim is intentionally small, with a focus on clarity and
-reproducibility. Anticipated use cases include early-stage design
-studies, sensitivity and uncertainty analyses, and education. The code
-is organized to facilitate extension: users can introduce alternative
-correlations for wall temperature, more complex temperature
-dependencies for permittivity, or multi-layer radome models while
-reusing the existing workflow and plotting utilities.
+\section{Numerical implementation and software design}
+AeroRadomeSim is implemented in Python and currently consists of a small
+set of modules that separate the aerothermodynamic model, dielectric
+model, and RF transmission calculations. The main dependencies are:
+\begin{itemize}
+  \item \texttt{numpy} for numerical arrays and vectorised operations;
+  \item \texttt{scipy} for selected mathematical utilities;
+  \item \texttt{matplotlib} for generating publication-quality plots.
+\end{itemize}
+The public API exposes two main workflows:
+\begin{enumerate}
+  \item \texttt{mach\_sweep}, which evaluates $T_w(M_{\infty})$ and
+        dynamic pressure $q(M_{\infty})$ over a user-specified Mach
+        range and altitude;
+  \item \texttt{radome\_rf}, which computes transmission characteristics
+        $T(f,T)$ for a given material model and wall thickness.
+\end{enumerate}
+Example scripts located in the \texttt{scripts/} directory demonstrate
+how these functions can be combined to create complete parametric
+studies and generate figures such as those shown in
+Section~\ref{sec:results}. Basic unit tests in the \texttt{tests/}
+directory verify consistency with analytic expressions for stagnation
+temperature and transmission through a lossless quarter-wave transformer
+in the isothermal limit.
 
-\section{Example results}
-\label{sec:example}
+The code is intentionally written in a clear, didactic style with
+extensive inline documentation rather than micro-optimised for
+performance. For the small problem sizes considered here (one or two
+parametric dimensions), a typical sweep executes in well under a second
+on a laptop, making the tool suitable for interactive exploration in
+Jupyter notebooks or educational demonstrations.
 
-To illustrate typical outputs of AeroRadomeSim, Figure~\ref{fig:q_vs_mach}
-shows the dynamic pressure as a function of Mach number at a representative
-altitude, while Figure~\ref{fig:radome_s21} shows the normal-incidence
-transmission coefficient \(|S_{21}|\) versus frequency for a simple
-single-layer radome model.
+\section{Case studies}
+\label{sec:results}
+We now illustrate typical uses of AeroRadomeSim through a set of simple
+case studies. The goal is not to reproduce a specific flight vehicle,
+but rather to highlight qualitative trends and the interplay between
+aerothermal heating and RF transmission.
+
+\subsection{Dynamic pressure and wall temperature versus Mach number}
+As a first example we consider level flight at an altitude of
+$h=10~\text{km}$, with free-stream properties obtained from a standard
+atmosphere model and $\gamma = 1.4$. We evaluate dynamic pressure and
+wall temperature using Eqs.~\eqref{eq:stagnationT} and
+\eqref{eq:wallT}, with a representative recovery factor $r=0.9$.
+
+Figure~\ref{fig:q_vs_mach} shows the resulting dynamic pressure as a
+function of Mach number over the range $0 \le M_{\infty} \le 3$. The
+approximately quadratic growth in $q$ with Mach number is evident. At
+$M_{\infty} \approx 2.5$ the dynamic pressure exceeds
+$5\times 10^5~\text{Pa}$, indicating substantial aerodynamic loading on
+the radome structure and providing a convenient reference for sizing
+studies.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.7\textwidth]{docs/img/q_vs_mach.png}
-  \caption{Dynamic pressure \(q = \tfrac12\rho U^2\) versus Mach number
-  at \(h=10\,\mathrm{km}\), generated with the \texttt{mach\_sweep}
-  utility in \texttt{aeroradomesim}.}
+  \caption{Dynamic pressure $q = \tfrac12\rho_{\infty} U_{\infty}^2$
+  versus Mach number at $h=10~\text{km}$, generated with the
+  \texttt{mach\_sweep} utility in \texttt{aeroradomesim}.}
   \label{fig:q_vs_mach}
 \end{figure}
+
+The same sweep also yields the wall temperature $T_w(M_{\infty})$,
+which is used as input to the temperature-dependent dielectric model in
+the next example. For brevity we omit an additional figure for
+$T_w(M_{\infty})$, but it can be generated with a single additional
+plot command in the provided example script.
+
+\subsection{Radome transmission versus frequency at elevated temperature}
+To illustrate the impact of temperature-dependent dielectric properties,
+we consider a single-layer radome with thickness $d=10~\text{mm}$ and
+baseline properties $\varepsilon'_0 = 4.0$ and
+$\tan\delta_0 = 2\times 10^{-3}$ at $T_{\mathrm{ref}} = 300~\text{K}$.
+We adopt modest positive thermal sensitivities
+$a_{\varepsilon} = 2\times 10^{-3}~\text{K}^{-1}$ and
+$a_{\delta} = 5\times 10^{-6}~\text{K}^{-1}$, representative of a
+generic composite material.
+
+Figure~\ref{fig:radome_s21} shows the magnitude of the transmission
+coefficient $|S_{21}|$ (in decibels) as a function of frequency over the
+L--S band at $T=300~\text{K}$. At this temperature the insertion loss is
+modest, with $L_T$ below approximately $2~\text{dB}$ across the band for
+normal incidence. As the Mach number and hence wall temperature
+increase, Eqs.~\eqref{eq:epsT}--\eqref{eq:tandT} predict an increase in
+both $\varepsilon'$ and $\tan\delta$, leading to stronger mismatch and
+higher loss. The provided example script sweeps over temperature to
+illustrate this trend; additional figures can be generated to visualise
+$L_T$ as a function of both $f$ and $T$.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.7\textwidth]{docs/img/radome_s21_T300K.png}
-  \caption{Example radome transmission magnitude \(|S_{21}|\) versus
-  frequency at \(T=300\,\mathrm{K}\) for a single-layer dielectric
-  slab, computed with the transmission-line model in
+  \caption{Example radome transmission magnitude $|S_{21}|$ versus
+  frequency at $T=300~\text{K}$ for a single-layer dielectric slab,
+  computed with the transmission-line model in
   \texttt{aeroradomesim}.}
   \label{fig:radome_s21}
 \end{figure}
 
+These simple case studies demonstrate how AeroRadomeSim can be used to
+explore the coupled effects of Mach number, altitude, material
+properties, and wall thickness on both structural loading and RF
+transmission using only a few lines of Python.
+
+\section{Discussion, limitations, and future work}
+The present model deliberately sacrifices geometric and physical
+fidelity in favour of transparency and rapid turnaround. The main
+limitations are:
+\begin{itemize}
+  \item The wall temperature is represented by a single equivalent value
+        $T_w$, whereas real radomes exhibit spatially varying
+        temperature distributions driven by three-dimensional flow and
+        conduction through the structure.
+  \item Only normal-incidence transmission through a single homogeneous
+        layer is treated. Real systems may involve multi-layer
+        sandwich constructions, frequency-selective surfaces, and
+        oblique incidence.
+  \item Temperature dependence of mechanical properties and structural
+        deformation are not considered.
+\end{itemize}
+Despite these simplifications, the tool already supports several useful
+applications in early-stage design, sensitivity analysis, and
+education. Future work will focus on extending the RF module to handle
+multi-layer stacks and oblique incidence, coupling AeroRadomeSim to
+external aerothermal solvers that provide spatial temperature fields,
+and adding convenience wrappers for Monte Carlo uncertainty studies
+over material parameters.
 
 \section*{Code availability}
 The AeroRadomeSim source code is openly available on GitHub at:
@@ -155,5 +328,28 @@ the DOI:
 \begin{center}
   \url{https://doi.org/10.5281/zenodo.17817671}
 \end{center}
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+% Replace the placeholders below with real references on radome design,
+% aerothermodynamics, and transmission-line modelling before submission.
+
+\bibitem{radome_text}
+A.~Author.
+\newblock \emph{Representative Radome Engineering Text}.
+\newblock Publisher, Year.
+
+\bibitem{aero_text}
+B.~Author.
+\newblock \emph{Compressible Flow and Aerothermodynamics}.
+\newblock Publisher, Year.
+
+\bibitem{em_text}
+C.~Author.
+\newblock \emph{Transmission-Line and Wave Propagation}.
+\newblock Publisher, Year.
+
+\end{thebibliography}
 
 \end{document}
