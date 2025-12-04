@@ -1,0 +1,27 @@
+name: Build LaTeX report
+
+on:
+  workflow_dispatch:          # دستی می‌توانی Run کنی
+  push:
+    paths:
+      - 'report/**'
+      - '.github/workflows/build-report.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: report/main.tex
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeroradomesim-report
+          path: main.pdf
