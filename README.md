@@ -36,4 +36,10 @@ S. A. Asgari, *AeroRadomeSim: Numerical simulation of Mach 0–3
 aerothermodynamics and temperature-dependent radome RF transmission*,
 Zenodo (2025). https://doi.org/10.5281/zenodo.17817671
 
+## Report
+
+A short software report describing the physical model and typical results is
+available as:
+
+- [`paper/AeroRadomeSim_report.pdf`](paper/AeroRadomeSim_report.pdf)
 
