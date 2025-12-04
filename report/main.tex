@@ -116,6 +116,35 @@ correlations for wall temperature, more complex temperature
 dependencies for permittivity, or multi-layer radome models while
 reusing the existing workflow and plotting utilities.
 
+\section{Example results}
+\label{sec:example}
+
+To illustrate typical outputs of AeroRadomeSim, Figure~\ref{fig:q_vs_mach}
+shows the dynamic pressure as a function of Mach number at a representative
+altitude, while Figure~\ref{fig:radome_s21} shows the normal-incidence
+transmission coefficient \(|S_{21}|\) versus frequency for a simple
+single-layer radome model.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.7\textwidth]{docs/img/q_vs_mach.png}
+  \caption{Dynamic pressure \(q = \tfrac12\rho U^2\) versus Mach number
+  at \(h=10\,\mathrm{km}\), generated with the \texttt{mach\_sweep}
+  utility in \texttt{aeroradomesim}.}
+  \label{fig:q_vs_mach}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.7\textwidth]{docs/img/radome_s21_T300K.png}
+  \caption{Example radome transmission magnitude \(|S_{21}|\) versus
+  frequency at \(T=300\,\mathrm{K}\) for a single-layer dielectric
+  slab, computed with the transmission-line model in
+  \texttt{aeroradomesim}.}
+  \label{fig:radome_s21}
+\end{figure}
+
+
 \section*{Code availability}
 The AeroRadomeSim source code is openly available on GitHub at:
 \begin{center}
