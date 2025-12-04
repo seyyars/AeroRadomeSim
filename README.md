@@ -28,3 +28,12 @@ Radome transmission vs frequency
 ![T=300K](docs/img/radome_s21_T300K.png)
 ![T=420K](docs/img/radome_s21_T420K.png)
 
+## How to cite
+
+If you use AeroRadomeSim in your research, please cite:
+
+S. A. Asgari, *AeroRadomeSim: Numerical simulation of Mach 0–3
+aerothermodynamics and temperature-dependent radome RF transmission*,
+Zenodo (2025). https://doi.org/10.5281/zenodo.17817671
+
+
